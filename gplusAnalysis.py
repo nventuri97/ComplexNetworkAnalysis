@@ -9,6 +9,8 @@ from random import *
 from powerlaw import *
 
 gp_graph=read("./soc-google-plus.txt", format="ncol", directed=False)
+#gp_graph=read("./soc-google-plus.10K.sb.txt", format="ncol", directed=False)
+
 summary(gp_graph, verbosity=1, max_rows = 25, edge_list_format = 'edgelist')
 
 vertexes=gp_graph.vs()
@@ -33,3 +35,26 @@ gc_index=response.index(1)
 gp_GC=gp_clust.subgraph(gc_index)
 
 summary(gp_GC, verbosity=1, max_rows = 25, edge_list_format = 'edgelist')
+
+
+gp_graph.vs["color"]='red'
+print(len(gp_clust.membership))
+print(gp_graph.vcount())
+for i in range(gp_graph.vcount()):
+    if gp_clust.membership[i]==gc_index:
+        gp_graph.vs[i]["color"]='blue'
+
+try:
+    del visual_style
+    visual_style = {}
+except NameError:
+    visual_style = {}
+    
+visual_style["bbox"] = (600,600)
+visual_style["label"] = []
+visual_style["layout"] = gp_graph.layout_fruchterman_reingold()
+visual_style["vertex_size"] = 5
+visual_style["vertex_shape"] = 'circle'
+visual_style["edge_arrow_size"] = 0.2
+
+plot(gp_graph, **visual_style)
