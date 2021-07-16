@@ -179,3 +179,181 @@ _ = plt.ylabel("frequency")
 _ = plt.title("Histogram of UNWEIGHTED path length")
 
 plt.show()
+
+#-----Erdos Renyi graph comparison-----
+er_gp_all = Graph.Erdos_Renyi(n = gp_GC.vcount(), m = gp_GC.ecount())
+
+# take only the Giant Component
+er_gp = er_gp_all.clusters(mode = "WEAK").giant()
+print("The number of vertexes of giant component's Erdos Renyi G+ graph ",er_gp.vcount())
+print("The number of vertexes of giant component's the original G+ graph ",gp_GC.vcount())
+
+# we use GridSpecs for a finer control of the plot positioning
+fig_sizes = (fig_sizes[0], 2*default_sizes[1])
+f = plt.figure(figsize = fig_sizes)
+
+# create a 2x2 Grid Specification
+gs = gridspec.GridSpec(2, 2)
+
+# add subplots to the figure, using the GridSpec gs
+# position [0,0] (upper-left corner)
+ax1 = plt.subplot(gs[0,0])
+ax2 = plt.subplot(gs[0,1])
+# the third plot spans the entire second row
+ax3 = plt.subplot(gs[1,:])
+
+# compute and plot the histogram of FB degrees
+d_gp = gp_GC.degree()
+_,_,_ = ax1.hist(d_gp, bins=range(1,max(d_gp)+2), density = True, color = 'red')
+_ = ax1.set_xlim(0,80)
+_ = ax1.set_xlabel("$d$")
+_ = ax1.set_ylabel("Frequencies")
+_ = ax1.set_title("ISTOGRAMMA GRADI GPLUS")
+
+# compute and plot the histogram of ER degrees
+d_er = er_gp.degree()
+_,_,_ = ax2.hist(d_er, bins=range(1,max(d_er)+2), density = True, color = 'blue')
+_ = ax2.set_xlim(0,80)
+_ = ax2.set_xlabel("$d$")
+_ = ax2.set_ylabel("Frequencies")
+_ = ax2.set_title("ISTOGRAMMA GRADI ER")
+
+# compute and plot the degree CCDFs
+gp_ecdf = ECDF(d_gp)
+er_ecdf = ECDF(d_er)
+x = np.arange(1,max(d_gp)+1)
+_ = ax3.loglog(x, 1-gp_ecdf(x), 'ro', label = 'GPLUS')
+x = np.arange(1,max(d_er)+1)
+_ = ax3.loglog(x, 1-er_ecdf(x), 'bo', label = 'Erdos-Renyi')
+_ = ax3.set_xlabel("$d$")
+_ = ax3.set_ylabel("$P(D>d)$")
+_ = ax3.set_title("Comparison between degree CCDFs")
+_ = ax3.legend(numpoints = 1)
+
+plt.show()
+
+# clustering
+print("Giant component's global transitivity Erdos Renyi graph ",er_gp.transitivity_undirected())
+print("Giant component's local transitivity Erdos Renyi graph for nodes with less then 2 neighbours ",er_gp.transitivity_avglocal_undirected(mode="zero"))
+
+# Shortest path lenght
+# on a subset of the nodes, as otherwise it will take forever to compute
+gp_vs_src = sample(list(gp_GC.vs), 1000)
+gp_vs_trg = sample(list(gp_GC.vs), 1000)
+er_vs_src = sample(list(er_gp.vs), 1000)
+er_vs_trg = sample(list(er_gp.vs), 1000)
+
+gp_sp = mean(np.array(gp_GC.shortest_paths(gp_vs_src, gp_vs_trg, weights=None)).flatten())
+print("Erdos Renyi shortest path avg ",mean(np.array(er_gp.shortest_paths(er_vs_src, er_vs_trg)).flatten()))
+
+#-----Fixed power-law graph comparison-----
+# Analyse the entire graph
+
+# First, we find the best power law fit for the degree distribution
+# with a fixed minimum value xmin (minimum degree for which the fitting is computed)
+# - see the plot of the CCDFs for understanding how fitting depends on xmin
+xmin = 100
+fit_pl = Fit(gp_GC.degree(), xmin = xmin)
+# by computing automatically the "best" xmin value
+fit_pl_auto = Fit(gp_GC.degree())
+
+exp_pl_auto = fit_pl_auto.alpha
+xmin_auto = fit_pl_auto.xmin
+exp_pl = fit_pl.alpha
+print ("PL exponents: (xmin=%d) %.2f; (auto xmin=%.2f) %.2f" % (xmin, exp_pl, xmin_auto, exp_pl_auto))
+
+# compute the number of nodes and edges of the FB graph to generate the equivalent static Power Law graph
+N = gp_GC.vcount()
+M = gp_GC.ecount()
+
+# Equivalent graph for the fitting with fixed xmin
+pl_gp_all = Graph.Static_Power_Law(N, M, exp_pl)
+# the graph could not be connected, so keep the GC only
+pl_gp = pl_gp_all.clusters(mode = "WEAK").giant()
+
+# Equivalent graph for the fitting with automatic xmin
+pl_gp_auto_all = Graph.Static_Power_Law(N, M, exp_pl_auto)
+pl_gp_auto = pl_gp_auto_all.clusters(mode = "WEAK").giant()
+
+# clustering coefficients
+cc_pl = pl_gp.transitivity_undirected()
+cc_pl_auto = pl_gp_auto.transitivity_undirected()
+cc_gp = gp_GC.transitivity_undirected()
+print ("Clustering: (GP) %.5f; (PL xmin=%d) %.5f; (PL auto xmin) %.5f" %(cc_gp, xmin, cc_pl, cc_pl_auto))
+
+# Shortest path lenght
+# on a subset of the nodes, as otherwise it will take forever to compute
+pl_vs_src = sample(list(pl_gp.vs), 500)
+pl_vs_trg = sample(list(pl_gp.vs), 500)
+
+pl_auto_vs_src = sample(list(pl_gp_auto.vs), 500)
+pl_auto_vs_trg = sample(list(pl_gp_auto.vs), 500)
+
+sp_pl = mean(np.array(pl_gp.shortest_paths(pl_vs_src, pl_vs_trg)).flatten())
+sp_pl_auto = mean(np.array(pl_gp_auto.shortest_paths(pl_auto_vs_src, pl_auto_vs_trg)).flatten())
+print ("Shortest paths: (GP) %.2f; (PL xmin=%d) %.2f; (PL auto xmin) %.2f" % (gp_sp, xmin, sp_pl, sp_pl_auto))
+
+# Now we compare the degree distributions for the complete GP Giant Component
+# we use GridSpecs for a finer control of the plot positioning
+fig_sizes = (fig_sizes[0], 2*default_sizes[1])
+f = plt.figure(figsize = fig_sizes)
+
+# create a 2x3 Grid Specification
+gs = gridspec.GridSpec(2, 3)
+
+# add subplots to the figure, using the GridSpec gs
+# position [0,0] (upper-left corner)
+ax1 = plt.subplot(gs[0,0])
+ax2 = plt.subplot(gs[0,1])
+ax3 = plt.subplot(gs[0,2])
+# the fourth plot spans the entire second row
+ax4 = plt.subplot(gs[1,:])
+
+# compute and plot the histogram of FB degrees
+d_gp = gp_GC.degree()
+_,_,_ = ax1.hist(d_gp, bins=range(1,max(d_gp)+2), density = True, color = 'red')
+_ = ax1.set_xlim(0,80)
+_ = ax1.set_xlabel("$d$")
+_ = ax1.set_ylabel("Frequencies")
+_ = ax1.set_title("Histogram of GP degrees")
+
+# compute and plot the histogram of Static Power Law degrees with set xmin
+d_pl = pl_gp.degree()
+_,_,_ = ax2.hist(d_pl, bins=range(1,max(d_pl)+2), density = True, color = 'blue', label = "$\gamma$ = %.2f" % exp_pl)
+_ = ax2.set_xlim(0,80)
+_ = ax2.set_xlabel("$d$")
+_ = ax2.set_ylabel("Frequencies")
+_ = ax2.set_title("Histogram of PL degrees (xmin=%d)" % xmin)
+_ = ax2.legend()
+
+# compute and plot the histogram of Static Power law degrees with auto xmin
+d_pl_auto = pl_gp_auto.degree()
+_,_,_ = ax3.hist(d_pl_auto, bins=range(1,max(d_pl_auto)+2), density = True, color = 'green', label = "$\gamma$ = %.2f" % exp_pl_auto)
+_ = ax3.set_xlim(0,80)
+_ = ax3.set_xlabel("$d$")
+_ = ax3.set_ylabel("Frequencies")
+_ = ax3.set_title("Histogram of PL degrees (auto xmin)")
+_ = ax3.legend()
+
+# compute and plot the degree CCDFs
+gp_ecdf = ECDF(d_gp)
+pl_ecdf = ECDF(d_pl)
+pl_auto_ecdf = ECDF(d_pl_auto)
+x = np.arange(1,max(d_gp)+1)
+_ = ax4.loglog(x, 1-gp_ecdf(x), 'ro', label = 'GPLUS')
+x = np.arange(1,max(d_pl)+1)
+_ = ax4.loglog(x, 1-pl_ecdf(x), 'bo', label = 'Static PL xmin=%d' % xmin)
+x = np.arange(1,max(d_pl_auto)+1)
+_ = ax4.loglog(x, 1-pl_auto_ecdf(x), 'go', label = 'Static PL auto xmin')
+_ = ax4.set_xlabel("$d$")
+_ = ax4.set_ylabel("$P(D>d)$")
+_ = ax4.set_title("Comparison between degree CCDFs")
+_ = ax4.legend(numpoints = 1)
+
+# for reference, plot the power law functions corresponding to the fitting with fixed and automatic xmin
+x1 = np.arange(xmin_auto, max(d_gp)+1)
+_ = ax4.loglog(x1, 1000000000000 * x1**(-exp_pl_auto), 'g-', linewidth = 3)
+x1 = np.arange(xmin, max(d_gp)+1)
+_ = ax4.loglog(x1, 1000 * x1**(-exp_pl), 'b-', linewidth = 2)
+
+plt.show()
